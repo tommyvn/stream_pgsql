@@ -13,8 +13,8 @@
 
 %% API
 -export([
-  start_link/0,
-  start_child/2
+  start_link/1,
+  start_child/1
 ]).
 
 %% Supervisor callbacks
@@ -32,10 +32,10 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
+-spec(start_link(CouchConn :: term()) ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(CouchConn) ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, [CouchConn]).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -58,7 +58,7 @@ start_link() ->
   }} |
   ignore |
   {error, Reason :: term()}).
-init([]) ->
+init([PGConn]) ->
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 0,
   MaxSecondsBetweenRestarts = 1,
@@ -69,8 +69,8 @@ init([]) ->
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {stream_server, {stream_server, start_link, []},
-    Restart, Shutdown, Type, [stream_server]},
+  AChild = {stream_fsm, {stream_fsm, start_link, [PGConn]},
+    Restart, Shutdown, Type, [stream_fsm]},
 
   {ok, {SupFlags, [AChild]}}.
 
@@ -78,5 +78,5 @@ init([]) ->
 %%% Internal functions
 %%%===================================================================
 
-start_child(Name, ModeList) ->
-  supervisor:start_child(?SERVER, [Name, ModeList]).
+start_child(Name) ->
+  supervisor:start_child(?SERVER, [Name]).

@@ -11,22 +11,22 @@ But some day soon it will be awesome.
 ```
 1> stream:start_all().
 ok
-2> {ok, WS} = stream:open("testing", [exclusive, write]).
+2> {ok, WS} = stream:open("testing", [exclusive, write, binary]).
 {ok,<0.44.0>}
-3> {ok, RS1} = stream:open("testing", [read]).           
+3> {ok, RS1} = stream:open("testing", [read, binary]).
 {ok,<0.47.0>}
-4> {ok, RS2} = stream:open("testing", [read]).
+4> {ok, RS2} = stream:open("testing", [read, binary]).
 {ok,<0.50.0>}
 5> stream:read(RS1, 512).
-{ok,[]}
-6> stream:write(WS, "tom was here").
+{ok,<<>>}
+6> stream:write(WS, <<"tom was here">>).
 ok
-7> stream:read(RS1, 512).           
-{ok,"tom was here"}
+7> stream:read(RS1, 512).
+{ok,<<"tom was here">>}
 8> stream:read(RS2, 512).
-{ok,"tom was here"}
+{ok,<<"tom was here">>}
 9> stream:read(RS2, 512).
-{ok,[]}
+{ok,<<>>}
 10> stream:close(WS).
 ok
 11> stream:read(RS2, 512).

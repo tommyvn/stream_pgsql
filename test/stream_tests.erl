@@ -24,16 +24,18 @@ run_all_test_() ->
           delete_non_existant_file_(),
           open_file_with_bad_args_(),
           open_existing_file_write_(),
-          open_and_close_file_(),
+          open_for_read_and_close_file_(),
           create_and_close_file_(),
           open_read_and_write_to_file_(),
-          open_write_and_read_to_file_(),
+          open_write_and_read_from_file_(),
           open_and_close_and_write_to_file_(),
           open_and_write_to_file_(),
           open_non_existent_file_for_read_(),
           write_read_write_some_more_read_(),
-          write_multiple_read_to_eof_read_close_read_(),
-          write_and_read_back_file_()
+          write_multiple_read_to_eof_read_close_read_()
+%%           write_and_read_back_file_(),
+%%           somehow_test_pid_dies_on_linked_pid_exit(),
+%%           somehow_test_the_chunk_size_is_honered()
         ]
       }
     end
@@ -67,7 +69,7 @@ open_existing_file_write_() ->
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
       ?IOModule:close(IODevice),
       Name
     end,
@@ -76,7 +78,7 @@ open_existing_file_write_() ->
       ok
     end,
     fun(Name) ->
-      R1 = ?IOModule:open(Name, [write, exclusive]),
+      R1 = ?IOModule:open(Name, [write, exclusive, binary]),
       [
         ?_assertMatch({error, eexist}, R1)
       ]
@@ -95,7 +97,7 @@ create_and_close_file_() ->
      ok
    end,
    fun(Name) ->
-     R1 = ?IOModule:open(Name, [write, exclusive]),
+     R1 = ?IOModule:open(Name, [write, exclusive, binary]),
      {ok, IODevice} = R1,
      R2 = ?IOModule:close(IODevice),
      R3 = is_process_alive(IODevice),
@@ -110,18 +112,18 @@ create_and_close_file_() ->
 delete_existing_file_() ->
   Name = ?TEST_FILE,
   ?IOModule:delete(Name),
-  {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+  {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
   ?IOModule:close(IODevice),
   [
     ?_assertMatch(ok, ?IOModule:delete(Name))
   ].
 
-open_and_close_file_() ->
+open_for_read_and_close_file_() ->
   {setup,
    fun() ->
      Name = ?TEST_FILE,
      ?IOModule:delete(Name),
-     {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+     {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
      ?IOModule:close(IODevice),
      Name
    end,
@@ -130,7 +132,7 @@ open_and_close_file_() ->
      ok
    end,
    fun(Name) ->
-     R1 = ?IOModule:open(Name, [read]),
+     R1 = ?IOModule:open(Name, [read, binary]),
      {ok, IODevice} = R1,
      R2 = is_process_alive(IODevice),
      R3 = ?IOModule:close(IODevice),
@@ -155,7 +157,7 @@ open_non_existent_file_for_read_() ->
       ok
     end,
     fun(Name) ->
-      R1 = ?IOModule:open(Name, [read]),
+      R1 = ?IOModule:open(Name, [read, binary]),
       [
         ?_assertMatch({error, enoent}, R1)
       ]
@@ -167,7 +169,7 @@ open_and_write_to_file_() ->
    fun() ->
      Name = ?TEST_FILE,
      ?IOModule:delete(Name),
-     {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+     {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
      {Name, IODevice}
    end,
    fun({Name, IODevice}) ->
@@ -187,7 +189,7 @@ open_and_close_and_write_to_file_() ->
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
       ?IOModule:close(IODevice),
       {Name, IODevice}
     end,
@@ -207,9 +209,9 @@ open_read_and_write_to_file_() ->
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive]),
+      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
       ?IOModule:close(IODeviceW),
-      {ok, IODevice} = ?IOModule:open(Name, [read]),
+      {ok, IODevice} = ?IOModule:open(Name, [read, binary]),
       {Name, IODevice}
     end,
     fun({Name, IODevice}) ->
@@ -224,12 +226,12 @@ open_read_and_write_to_file_() ->
     end
   }.
 
-open_write_and_read_to_file_() ->
+open_write_and_read_from_file_() ->
   {setup,
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive]),
+      {ok, IODevice} = ?IOModule:open(Name, [write, exclusive, binary]),
       {Name, IODevice}
     end,
     fun({Name, IODevice}) ->
@@ -258,17 +260,17 @@ write_and_read_back_file_() ->
       ok
     end,
     fun(Name) ->
-      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive]),
+      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
       R1 = ?IOModule:write(IODeviceW, "some data"),
       ?IOModule:close(IODeviceW),
-      {ok, IODeviceR} = ?IOModule:open(Name, [read]),
+      {ok, IODeviceR} = ?IOModule:open(Name, [read, binary]),
       R2 = ?IOModule:read(IODeviceR, 512),
       R3 = ?IOModule:close(IODeviceR),
       R4 = is_process_alive(IODeviceR),
       [
         ?_assertMatch(ok, R1),
-        ?_assertMatch({ok, "some data"}, R2),
-        ?_assertNotMatch({ok, "some other data"}, R2),
+        ?_assertMatch({ok, <<"some data">>}, R2),
+        ?_assertNotMatch({ok, <<"some other data">>}, R2),
         ?_assertMatch(ok, R3),
         ?_assertNot(R4)
       ]
@@ -280,8 +282,8 @@ write_read_write_some_more_read_() ->
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive]),
-      {ok, IODeviceR} = ?IOModule:open(Name, [read]),
+      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
+      {ok, IODeviceR} = ?IOModule:open(Name, [read, binary]),
       {Name, IODeviceW, IODeviceR}
     end,
     fun({Name, IODeviceW, IODeviceR}) ->
@@ -291,13 +293,15 @@ write_read_write_some_more_read_() ->
     end,
     fun({_Name, IODeviceW, IODeviceR}) ->
       R1 = ?IOModule:write(IODeviceW, "some data"),
-      ?_assertMatch(ok, R1),
       R2 = ?IOModule:read(IODeviceR, 512),
-      ?_assertMatch({ok, "some data"}, R2),
       R3 = ?IOModule:write(IODeviceW, "some more data"),
-      ?_assertMatch(ok, R3),
       R4 = ?IOModule:read(IODeviceR, 512),
-      ?_assertMatch({ok, "some more data"}, R4)
+      [
+        ?_assertMatch(ok, R1),
+        ?_assertMatch({ok, <<"some data">>}, R2),
+        ?_assertMatch(ok, R3),
+        ?_assertMatch({ok, <<"some more data">>}, R4)
+      ]
     end
   }.
 
@@ -306,9 +310,9 @@ write_multiple_read_to_eof_read_close_read_() ->
     fun() ->
       Name = ?TEST_FILE,
       ?IOModule:delete(Name),
-      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive]),
-      {ok, IODeviceR1} = ?IOModule:open(Name, [read]),
-      {ok, IODeviceR2} = ?IOModule:open(Name, [read]),
+      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
+      {ok, IODeviceR1} = ?IOModule:open(Name, [read, binary]),
+      {ok, IODeviceR2} = ?IOModule:open(Name, [read, binary]),
       {Name, IODeviceW, IODeviceR1, IODeviceR2}
     end,
     fun({Name, _IODeviceW, IODeviceR1, IODeviceR2}) ->
@@ -330,12 +334,12 @@ write_multiple_read_to_eof_read_close_read_() ->
       R11 = ?IOModule:read(IODeviceR2, 512),
       [
         ?_assertMatch(ok, R1),
-        ?_assertMatch({ok, "some data"}, R2),
-        ?_assertMatch({ok, ""}, R3),
+        ?_assertMatch({ok, <<"some data">>}, R2),
+        ?_assertMatch({ok, <<>>}, R3),
         ?_assertMatch(ok, R4),
-        ?_assertMatch({ok, "some data"}, R5),
-        ?_assertMatch({ok, "some datasome data"}, R6),
-        ?_assertMatch({ok, ""}, R7),
+        ?_assertMatch({ok, <<"some data">>}, R5),
+        ?_assertMatch({ok, <<"some datasome data">>}, R6),
+        ?_assertMatch({ok, <<>>}, R7),
         ?_assertMatch(ok, R8),
         ?_assertNot(R9),
         ?_assertMatch(eof, R10),
