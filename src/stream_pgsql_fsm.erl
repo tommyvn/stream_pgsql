@@ -84,7 +84,10 @@ init([PGConn, Name]) ->
     timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 startup({open, binary_read}, _From, #state{pgconn = PGConn, name = Name} = State) ->
-  BinName = list_to_binary(Name),
+  BinName = case is_binary(Name) of
+    true  -> Name;
+    false -> list_to_binary(Name)
+  end,
   case pgsql:equery(PGConn, "select id from stream_pgsql_metadata where id = $1", [Name]) of
     {ok,[{column,<<"id">>,text,-1,-1,1}],[]} ->
       {stop, normal, {error, enoent}, State};

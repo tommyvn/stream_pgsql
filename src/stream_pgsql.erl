@@ -44,7 +44,7 @@ close(IODevice) ->
   end.
 
 start() ->
-  start_all(stream).
+  start_all(stream_pgsql).
 %%   observer:start().
 
 start_all(App) ->

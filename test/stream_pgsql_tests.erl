@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% -define(IOModule, file).
--define(IOModule, stream).
+-define(IOModule, stream_pgsql).
 -define(CHUNK_SIZE, 128).
 -define(TEST_FILE, "/tmp/test").
 
@@ -12,10 +12,10 @@
 run_all_test_() ->
   { setup,
     fun() ->
-      stream_pgsql:start()
+      ?IOModule:start()
     end,
     fun(_) ->
-      application:stop(stream)
+      application:stop(stream_pgsql)
     end,
     fun (_) ->
       {inorder,
