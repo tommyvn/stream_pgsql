@@ -1,13 +1,13 @@
--module(stream).
+-module(stream_pgsql).
 -export([open/2, delete/1, write/2, close/1, read/2]).
--export([start_all/0]).
+-export([start/0]).
 
 
 -record(filedetails, {mode = nil, exclusive = nil, binary = nil}).
 
 
 open(Name, ModeList) when is_list(Name) orelse is_binary(Name), is_list(ModeList) ->
-  {ok, StreamPid} = stream_sup:start_child(Name),
+  {ok, StreamPid} = stream_pgsql_sup:start_child(Name),
   case get_mode(ModeList) of
     {error, _Error} ->
       {error, badarg};
@@ -19,7 +19,7 @@ open(Name, ModeList) when is_list(Name) orelse is_binary(Name), is_list(ModeList
   end.
 
 delete(Name) ->
-  {ok, StreamPid} = stream_sup:start_child(Name),
+  {ok, StreamPid} = stream_pgsql_sup:start_child(Name),
   gen_fsm:sync_send_event(StreamPid, delete).
 
 write(IODevice, Bytes) ->
@@ -43,7 +43,7 @@ close(IODevice) ->
     exit:{noproc,_} -> {error, terminated}
   end.
 
-start_all() ->
+start() ->
   start_all(stream).
 %%   observer:start().
 

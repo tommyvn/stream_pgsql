@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 01. Sep 2014 20:09
 %%%-------------------------------------------------------------------
--module(stream_sup).
+-module(stream_pgsql_sup).
 -author("tom").
 
 -behaviour(supervisor).
@@ -69,8 +69,8 @@ init([PGConn]) ->
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {stream_fsm, {stream_fsm, start_link, [PGConn]},
-    Restart, Shutdown, Type, [stream_fsm]},
+  AChild = {stream_pgsql_fsm, {stream_pgsql_fsm, start_link, [PGConn]},
+    Restart, Shutdown, Type, [stream_pgsql_fsm]},
 
   {ok, {SupFlags, [AChild]}}.
 

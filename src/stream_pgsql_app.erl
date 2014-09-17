@@ -1,11 +1,11 @@
--module(stream_app).
+-module(stream_pgsql_app).
 -behaviour(application).
 
 -export([start/2]).
 -export([stop/1]).
 
 start(_Type, _Args) ->
-  ets:new(stream_in_progress, [set, named_table, public]),
+  ets:new(stream_pgsql_in_progress, [set, named_table, public]),
   {PGHost, PGUser, PGPassword, PGOptions} = case os:getenv("DATABASE_URL") of
     false ->
       {"localhost", "ttytube", "ttytube", [{database, "ttytube"}]};
@@ -16,7 +16,7 @@ start(_Type, _Args) ->
       {binary_to_list(Host), User, Password, [{port, Port}, {database, tl(binary_to_list(DBName))}, {ssl, trye}]}
   end,
   {ok, PGConn} = pgsql:connect(PGHost, PGUser, PGPassword, PGOptions),
-	stream_sup:start_link(PGConn).
+	stream_pgsql_sup:start_link(PGConn).
 
 stop(_State) ->
 	ok.

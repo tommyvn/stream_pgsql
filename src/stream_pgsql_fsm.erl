@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 08. Sep 2014 21:15
 %%%-------------------------------------------------------------------
--module(stream_fsm).
+-module(stream_pgsql_fsm).
 -author("tom").
 
 -behaviour(gen_fsm).
@@ -85,11 +85,11 @@ init([PGConn, Name]) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 startup({open, binary_read}, _From, #state{pgconn = PGConn, name = Name} = State) ->
   BinName = list_to_binary(Name),
-  case pgsql:equery(PGConn, "select id from stream_metadata where id = $1", [Name]) of
+  case pgsql:equery(PGConn, "select id from stream_pgsql_metadata where id = $1", [Name]) of
     {ok,[{column,<<"id">>,text,-1,-1,1}],[]} ->
       {stop, normal, {error, enoent}, State};
     {ok,[{column,<<"id">>,text,-1,-1,1}],[{BinName}]} ->
-      case ets:lookup(stream_in_progress, Name) of
+      case ets:lookup(stream_pgsql_in_progress, Name) of
         [] -> ok;
         [{Name, Pid}] ->
           erlang:monitor(process, Pid)
@@ -98,16 +98,16 @@ startup({open, binary_read}, _From, #state{pgconn = PGConn, name = Name} = State
   end;
 
 startup({open, binary_exclusive_write}, _From, #state{pgconn = PGConn, name = Name} = State) ->
-  case pgsql:equery(PGConn, "insert into stream_metadata (id) values ($1)", [Name]) of
+  case pgsql:equery(PGConn, "insert into stream_pgsql_metadata (id) values ($1)", [Name]) of
     {error,{error,error,<<"23505">>, _, _}} ->
       {stop, normal, {error, eexist}, State};
     {ok, 1} ->
-      ets:insert(stream_in_progress, {Name, self()}),
+      ets:insert(stream_pgsql_in_progress, {Name, self()}),
       {reply, ok, writing, State}
   end;
 
 startup(delete, _From, #state{pgconn = PGConn, name = Name} = State) ->
-  case { pgsql:equery(PGConn, "delete from stream_metadata where id = $1", [Name]), pgsql:equery(PGConn, "delete from stream_data where id = $1;", [Name]) } of
+  case { pgsql:equery(PGConn, "delete from stream_pgsql_metadata where id = $1", [Name]), pgsql:equery(PGConn, "delete from stream_pgsql_data where id = $1;", [Name]) } of
     { {ok, 1}, _} ->
       {stop, normal, ok, State};
     { {ok, 0}, _} ->
@@ -116,7 +116,7 @@ startup(delete, _From, #state{pgconn = PGConn, name = Name} = State) ->
 
 
 writing({write, Bytes}, _From, #state{pgconn = PGConn, name = Name} = State) ->
-  case pgsql:equery(PGConn, "insert into stream_data (id, data) values ($1, $2)", [Name, Bytes]) of
+  case pgsql:equery(PGConn, "insert into stream_pgsql_data (id, data) values ($1, $2)", [Name, Bytes]) of
     {ok, 1} -> {reply, ok, writing, State};
     _ -> {stop, normal, {error, eweird}, State}
   end;
@@ -132,7 +132,7 @@ reading({read, Number}, _From, #state{read_buffer = ReadBuffer} = State) when si
   {reply, {ok, ReadBuffer}, reading, State#state{read_buffer = <<>>}};
 
 reading({read, _Number} = Cmd, From, #state{pgconn = PGConn, name = Name, reading_chunk = PreviousChunk, follow = Follow, read_buffer = ReadBuffer} = State) ->
-  case pgsql:equery(PGConn, "select chunk, data from stream_data where id = $1 and chunk > $2 order by chunk limit 1", [Name, PreviousChunk]) of
+  case pgsql:equery(PGConn, "select chunk, data from stream_pgsql_data where id = $1 and chunk > $2 order by chunk limit 1", [Name, PreviousChunk]) of
     {ok, _, [{CurrentChunk, Data}]} ->
       reading(Cmd, From, State#state{reading_chunk = CurrentChunk, read_buffer = <<ReadBuffer/binary, Data/binary>>});
     {ok, _, []} ->
@@ -237,7 +237,7 @@ handle_sync_event(_Event, _From, StateName, State) ->
     timeout() | hibernate} |
   {stop, Reason :: normal | term(), NewStateData :: term()}).
 handle_info({'DOWN', _Ref, process, _Pid, _NormalOrNoproc}, reading, #state{name = Name} = State) ->
-  ets:delete(stream_in_progress, Name),
+  ets:delete(stream_pgsql_in_progress, Name),
   {next_state, reading, State#state{follow = false}}.
 %%
 %% handle_info(_Info, StateName, State) ->

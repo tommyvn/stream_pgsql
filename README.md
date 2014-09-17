@@ -9,29 +9,29 @@ But some day soon it will be awesome.
 
 
 ```
-1> stream:start_all().
+1> stream_pgsql:start_all().
 ok
-2> {ok, WS} = stream:open("testing", [exclusive, write, binary]).
+2> {ok, WS} = stream_pgsql:open("testing", [exclusive, write, binary]).
 {ok,<0.44.0>}
-3> {ok, RS1} = stream:open("testing", [read, binary]).
+3> {ok, RS1} = stream_pgsql:open("testing", [read, binary]).
 {ok,<0.47.0>}
-4> {ok, RS2} = stream:open("testing", [read, binary]).
+4> {ok, RS2} = stream_pgsql:open("testing", [read, binary]).
 {ok,<0.50.0>}
-5> stream:read(RS1, 512).
+5> stream_pgsql:read(RS1, 512).
 {ok,<<>>}
-6> stream:write(WS, <<"tom was here">>).
+6> stream_pgsql:write(WS, <<"tom was here">>).
 ok
-7> stream:read(RS1, 512).
+7> stream_pgsql:read(RS1, 512).
 {ok,<<"tom was here">>}
-8> stream:read(RS2, 512).
+8> stream_pgsql:read(RS2, 512).
 {ok,<<"tom was here">>}
-9> stream:read(RS2, 512).
+9> stream_pgsql:read(RS2, 512).
 {ok,<<>>}
-10> stream:close(WS).
+10> stream_pgsql:close(WS).
 ok
-11> stream:read(RS2, 512).
+11> stream_pgsql:read(RS2, 512).
 eof
-12> stream:read(RS1, 512).
+12> stream_pgsql:read(RS1, 512).
 eof
 13>
 ```

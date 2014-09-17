@@ -1,4 +1,4 @@
--module(stream_tests).
+-module(stream_pgsql_tests).
 -compile([export_all]).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -12,7 +12,7 @@
 run_all_test_() ->
   { setup,
     fun() ->
-      stream:start_all()
+      stream_pgsql:start()
     end,
     fun(_) ->
       application:stop(stream)

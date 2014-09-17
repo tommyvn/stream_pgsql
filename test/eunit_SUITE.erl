@@ -6,4 +6,4 @@ all() ->
 
 eunit(_) ->
   %%1 = 1.
-  ok = eunit:test(stream_tests).
+  ok = eunit:test(stream_pgsql_tests).

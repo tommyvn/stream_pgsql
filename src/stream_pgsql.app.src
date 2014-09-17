@@ -1,4 +1,4 @@
-{application, stream, [
+{application, stream_pgsql, [
 	{description, ""},
 	{vsn, "0.1.0"},
 	{modules, []},
@@ -7,6 +7,6 @@
 		kernel,
 		stdlib
 	]},
-	{mod, {stream_app, []}},
+	{mod, {stream_pgsql_app, []}},
 	{env, []}
 ]}.
