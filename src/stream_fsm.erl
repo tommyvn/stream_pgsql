@@ -136,11 +136,16 @@ reading({read, _Number} = Cmd, From, #state{pgconn = PGConn, name = Name, readin
     {ok, _, [{CurrentChunk, Data}]} ->
       reading(Cmd, From, State#state{reading_chunk = CurrentChunk, read_buffer = <<ReadBuffer/binary, Data/binary>>});
     {ok, _, []} ->
-      case Follow of
+      case size(ReadBuffer) > 0 of
         true ->
           {reply, {ok, ReadBuffer}, reading, State#state{read_buffer = <<>>}};
         false ->
-          {reply, eof, reading, State}
+          case Follow of
+            true ->
+              {reply, {ok, <<>>}, reading, State#state{read_buffer = <<>>}};
+            false ->
+              {reply, eof, reading, State}
+          end
       end;
     Error -> {stop, normal, {error, Error}, State}
   end;

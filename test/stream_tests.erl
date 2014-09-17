@@ -32,8 +32,8 @@ run_all_test_() ->
           open_and_write_to_file_(),
           open_non_existent_file_for_read_(),
           write_read_write_some_more_read_(),
-          write_multiple_read_to_eof_read_close_read_()
-%%           write_and_read_back_file_(),
+          write_multiple_read_to_eof_read_close_read_(),
+          write_and_read_back_file_()
 %%           somehow_test_pid_dies_on_linked_pid_exit(),
 %%           somehow_test_the_chunk_size_is_honered()
         ]
