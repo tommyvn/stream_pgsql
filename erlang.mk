@@ -62,15 +62,9 @@ help::
 
 # Core functions.
 
-ifeq ($(shell which wget 2>/dev/null | wc -l), 1)
 define core_http_get
 	wget --no-check-certificate -O $(1) $(2)|| rm $(1)
 endef
-else
-define core_http_get
-	erl -noshell -eval 'ssl:start(), inets:start(), case httpc:request(get, {"$(2)", []}, [{autoredirect, true}], []) of {ok, {{_, 200, _}, _, Body}} -> case file:write_file("$(1)", Body) of ok -> ok; {error, R1} -> halt(R1) end; {error, R2} -> halt(R2) end, halt(0).'
-endef
-endif
 
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
@@ -99,7 +93,7 @@ export ERL_LIBS
 PKG_FILE2 ?= $(CURDIR)/.erlang.mk.packages.v2
 export PKG_FILE2
 
-PKG_FILE_URL ?= https://raw.githubusercontent.com/ninenines/erlang.mk/master/packages.v2.tsv
+PKG_FILE_URL ?= https://raw.githubusercontent.com/extend/erlang.mk/master/packages.v2.tsv
 
 # Core targets.
 
@@ -120,11 +114,7 @@ define dep_fetch
 	if [ "$$$$VS" = "git" ]; then \
 		git clone -n -- $$$$REPO $(DEPS_DIR)/$(1); \
 		cd $(DEPS_DIR)/$(1) && git checkout -q $$$$COMMIT; \
-	elif [ "$$$$VS" = "hg" ]; then \
-		hg clone -U $$$$REPO $(DEPS_DIR)/$(1); \
-		cd $(DEPS_DIR)/$(1) && hg update -q $$$$COMMIT; \
 	else \
-		echo "Unknown or invalid dependency: $(1). Please consult the erlang.mk README for instructions." >&2; \
 		exit 78; \
 	fi
 endef
@@ -134,13 +124,13 @@ $(DEPS_DIR)/$(1):
 	@mkdir -p $(DEPS_DIR)
 	@if [ ! -f $(PKG_FILE2) ]; then $(call core_http_get,$(PKG_FILE2),$(PKG_FILE_URL)); fi
 ifeq (,$(dep_$(1)))
-	@DEPPKG=$$$$(awk 'BEGIN { FS = "\t" }; $$$$1 == "$(1)" { print $$$$2 " " $$$$3 " " $$$$4 }' $(PKG_FILE2);); \
+	DEPPKG=$$$$(awk 'BEGIN { FS = "\t" }; $$$$1 == "$(1)" { print $$$$2 " " $$$$3 " " $$$$4 }' $(PKG_FILE2);) \
 	VS=$$$$(echo $$$$DEPPKG | cut -d " " -f1); \
 	REPO=$$$$(echo $$$$DEPPKG | cut -d " " -f2); \
 	COMMIT=$$$$(echo $$$$DEPPKG | cut -d " " -f3); \
 	$(call dep_fetch,$(1))
 else
-	@VS=$(word 1,$(dep_$(1))); \
+	VS=$(word 1,$(dep_$(1))); \
 	REPO=$(word 2,$(dep_$(1))); \
 	COMMIT=$(word 3,$(dep_$(1))); \
 	$(call dep_fetch,$(1))
@@ -155,7 +145,7 @@ distclean-deps:
 # Packages related targets.
 
 $(PKG_FILE2):
-	@$(call core_http_get,$(PKG_FILE2),$(PKG_FILE_URL))
+	$(call core_http_get,$(PKG_FILE2),$(PKG_FILE_URL))
 
 pkg-list: $(PKG_FILE2)
 	@cat $(PKG_FILE2) | awk 'BEGIN { FS = "\t" }; { print \
@@ -210,13 +200,9 @@ xyrl_verbose = $(xyrl_verbose_$(V))
 
 # Core targets.
 
-app:: erlc-include ebin/$(PROJECT).app
+app:: ebin/$(PROJECT).app
 	$(eval MODULES := $(shell find ebin -type f -name \*.beam \
 		| sed "s/ebin\//'/;s/\.beam/',/" | sed '$$s/.$$//'))
-	@if [ -z "$$(grep -E '^[^%]*{modules,' src/$(PROJECT).app.src)" ]; then \
-		echo "Empty modules entry not found in $(PROJECT).app.src. Please consult the erlang.mk README for instructions." >&2; \
-		exit 1; \
-	fi
 	$(appsrc_verbose) cat src/$(PROJECT).app.src \
 		| sed "s/{modules,[[:space:]]*\[\]}/{modules, \[$(MODULES)\]}/" \
 		> ebin/$(PROJECT).app
@@ -249,11 +235,6 @@ clean:: clean-app
 
 # Extra targets.
 
-erlc-include:
-	-@if [ -d ebin/ ]; then \
-		find include/ src/ -type f -name \*.hrl -newer ebin -exec touch $(shell find src/ -type f -name "*.erl") \; 2>/dev/null || printf ''; \
-	fi
-
 clean-app:
 	$(gen_verbose) rm -rf ebin/
 
@@ -271,7 +252,7 @@ help::
 		"  bootstrap-lib      Generate a skeleton of an OTP library" \
 		"  bootstrap-rel      Generate the files needed to build a release" \
 		"  new t=TPL n=NAME   Generate a module NAME based on the template TPL" \
-		"  list-templates     List available templates"
+		"  bootstrap-lib      List available templates"
 
 # Bootstrap templates.
 
@@ -637,19 +618,13 @@ help::
 
 # Plugin-specific targets.
 
-$(DIALYZER_PLT): deps app
+plt: deps app
 	@dialyzer --build_plt --apps erts kernel stdlib $(PLT_APPS) $(ALL_DEPS_DIRS)
-
-plt: $(DIALYZER_PLT)
 
 distclean-plt:
 	$(gen_verbose) rm -f $(DIALYZER_PLT)
 
-ifneq ($(wildcard $(DIALYZER_PLT)),)
 dialyze:
-else
-dialyze: $(DIALYZER_PLT)
-endif
 	@dialyzer --no_native --src -r src $(DIALYZER_OPTS)
 
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
@@ -703,11 +678,13 @@ distclean-edoc:
 # Copyright (c) 2013-2014, Loïc Hoguin <essen@ninenines.eu>
 # This file is part of erlang.mk and subject to the terms of the ISC License.
 
-.PHONY: relx-rel distclean-relx-rel distclean-relx
+.PHONY: distclean-rel
 
 # Configuration.
 
 RELX_CONFIG ?= $(CURDIR)/relx.config
+
+ifneq ($(wildcard $(RELX_CONFIG)),)
 
 RELX ?= $(CURDIR)/relx
 export RELX
@@ -718,17 +695,14 @@ RELX_OUTPUT_DIR ?= _rel
 
 ifeq ($(firstword $(RELX_OPTS)),-o)
 	RELX_OUTPUT_DIR = $(word 2,$(RELX_OPTS))
-else
-	RELX_OPTS += -o $(RELX_OUTPUT_DIR)
 endif
 
 # Core targets.
 
-ifneq ($(wildcard $(RELX_CONFIG)),)
-rel:: distclean-relx-rel relx-rel
-endif
+rel:: distclean-rel $(RELX)
+	@$(RELX) -c $(RELX_CONFIG) $(RELX_OPTS)
 
-distclean:: distclean-relx-rel distclean-relx
+distclean:: distclean-rel
 
 # Plugin-specific targets.
 
@@ -740,40 +714,7 @@ endef
 $(RELX):
 	@$(call relx_fetch)
 
-relx-rel: $(RELX)
-	@$(RELX) -c $(RELX_CONFIG) $(RELX_OPTS)
+distclean-rel:
+	$(gen_verbose) rm -rf $(RELX) $(RELX_OUTPUT_DIR)
 
-distclean-relx-rel:
-	$(gen_verbose) rm -rf $(RELX_OUTPUT_DIR)
-
-distclean-relx:
-	$(gen_verbose) rm -rf $(RELX)
-
-# Copyright (c) 2014, M Robert Martin <rob@version2beta.com>
-# This file is contributed to erlang.mk and subject to the terms of the ISC License.
-
-.PHONY: shell
-
-# Configuration.
-
-SHELL_PATH ?= -pa ../$(PROJECT)/ebin $(DEPS_DIR)/*/ebin
-SHELL_OPTS ?=
-
-ALL_SHELL_DEPS_DIRS = $(addprefix $(DEPS_DIR)/,$(SHELL_DEPS))
-
-# Core targets
-
-help::
-	@printf "%s\n" "" \
-		"Shell targets:" \
-		"  shell              Run an erlang shell with SHELL_OPTS or reasonable default"
-
-# Plugin-specific targets.
-
-$(foreach dep,$(SHELL_DEPS),$(eval $(call dep_target,$(dep))))
-
-build-shell-deps: $(ALL_SHELL_DEPS_DIRS)
-	@for dep in $(ALL_SHELL_DEPS_DIRS) ; do $(MAKE) -C $$dep ; done
-
-shell: build-shell-deps
-	$(gen_verbose) erl $(SHELL_PATH) $(SHELL_OPTS)
+endif
