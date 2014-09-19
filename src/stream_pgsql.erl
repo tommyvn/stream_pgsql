@@ -1,5 +1,5 @@
 -module(stream_pgsql).
--export([open/2, delete/1, write/2, close/1, read/2]).
+-export([open/2, delete/1, write/2, close/1, read/2, list/0]).
 -export([start/0]).
 
 
@@ -42,6 +42,10 @@ close(IODevice) ->
   catch
     exit:{noproc,_} -> {error, terminated}
   end.
+
+list() ->
+  {ok, StreamPid} = stream_pgsql_sup:start_child(nil),
+  gen_fsm:sync_send_event(StreamPid, list).
 
 start() ->
   start_all(stream_pgsql).

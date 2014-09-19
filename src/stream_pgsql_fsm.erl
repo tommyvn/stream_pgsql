@@ -93,7 +93,8 @@ startup({open, binary_read}, _From, #state{pgconn = PGConn, name = Name} = State
       {stop, normal, {error, enoent}, State};
     {ok,[{column,<<"id">>,text,-1,-1,1}],[{BinName}]} ->
       case ets:lookup(stream_pgsql_in_progress, Name) of
-        [] -> ok;
+        [] ->
+          self() ! {'DOWN', make_ref(), process, nil, notevenstartedproc};
         [{Name, Pid}] ->
           erlang:monitor(process, Pid)
       end,
@@ -115,8 +116,13 @@ startup(delete, _From, #state{pgconn = PGConn, name = Name} = State) ->
       {stop, normal, ok, State};
     { {ok, 0}, _} ->
       {stop, normal, {error, enoent}, State}
-  end.
+  end;
 
+startup(list, _From, #state{pgconn = PGConn} = State) ->
+  case pgsql:squery(PGConn, "select id from stream_pgsql_metadata") of
+    {ok,[{column,<<"id">>,text,-1,-1,0}], R} ->
+      {stop, normal, lists:map(fun({X}) -> X end, R), State}
+  end.
 
 writing({write, Bytes}, _From, #state{pgconn = PGConn, name = Name} = State) ->
   case pgsql:equery(PGConn, "insert into stream_pgsql_data (id, data) values ($1, $2)", [Name, Bytes]) of
