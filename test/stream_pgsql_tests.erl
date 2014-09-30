@@ -7,8 +7,6 @@
 -define(CHUNK_SIZE, 128).
 -define(TEST_FILE, "/tmp/test").
 
--record(file, {open_result, name}).
-
 run_all_test_() ->
   { setup,
     fun() ->
@@ -33,7 +31,8 @@ run_all_test_() ->
           open_non_existent_file_for_read_(),
           write_read_write_some_more_read_(),
           write_multiple_read_to_eof_read_close_read_(),
-          write_and_read_back_file_()
+          write_and_read_back_file_(),
+          write_and_multiple_reads_()
 %%           somehow_test_pid_dies_on_linked_pid_exit(),
 %%           somehow_test_the_chunk_size_is_honered()
         ]
@@ -102,7 +101,6 @@ create_and_close_file_() ->
      R2 = ?IOModule:close(IODevice),
      R3 = is_process_alive(IODevice),
      [
-       ?_assertMatch({ok, _}, R1),
        ?_assertMatch(ok, R2),
        ?_assertNot(R3)
      ]
@@ -138,7 +136,6 @@ open_for_read_and_close_file_() ->
      R3 = ?IOModule:close(IODevice),
      R4 = is_process_alive(IODevice),
      [
-       ?_assertMatch({ok, _IODevice}, R1),
        ?_assert(R2),
        ?_assertMatch(ok, R3),
        ?_assertNot(R4)
@@ -347,3 +344,54 @@ write_multiple_read_to_eof_read_close_read_() ->
       ]
     end
   }.
+
+write_and_multiple_reads_() ->
+  {setup,
+    fun() ->
+      Name = ?TEST_FILE,
+      ?IOModule:delete(Name),
+      {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
+      {Name, IODeviceW, lists:map(fun({ok, X}) -> X end, [ ?IOModule:open(Name, [read, binary]) || _ <- lists:seq(0,0) ])}
+    end,
+    fun({Name, _IODeviceW, IODeviceRList}) ->
+      [ ?IOModule:close(IODeviceR) || IODeviceR <- IODeviceRList ],
+      ?IOModule:delete(Name)
+    end,
+    fun({_Name, IODeviceW, [ IODeviceR | _IODeviceRList ]}) ->
+      spawn_link(
+        fun() ->
+          write(IODeviceW, 10),
+          ok
+        end
+      ),
+      R1 = read(IODeviceR),
+      Expected = list_to_binary([ io_lib:format("some data ~B~n", [C]) || C <- lists:seq(10,1,-1) ]),
+      [
+        ?_assertEqual({ok, Expected}, R1)
+      ]
+    end
+  }.
+
+write(IODevice, 0) ->
+  ?IOModule:close(IODevice);
+
+write(IODevice, Count) ->
+  ?IOModule:write(IODevice, io_lib:format("some data ~B~n", [Count])),
+  write(IODevice, Count -1).
+
+read(IODeviceR) ->
+  read(IODeviceR, <<>>).
+
+read(IODeviceR, Acc) ->
+  case ?IOModule:read(IODeviceR, 512) of
+    eof ->
+      {ok, Acc};
+    {ok, <<>>} ->
+      timer:sleep(500),
+      read(IODeviceR, Acc);
+    {ok, Data} ->
+      NewAcc = <<Acc/binary, Data/binary>>,
+      read(IODeviceR, NewAcc);
+    Error ->
+      Error
+  end.

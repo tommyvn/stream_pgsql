@@ -13,7 +13,7 @@
 
 %% API
 -export([
-  start_link/1,
+  start_link/0,
   start_child/1
 ]).
 
@@ -32,10 +32,10 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(CouchConn :: term()) ->
+-spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(CouchConn) ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, [CouchConn]).
+start_link() ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -58,7 +58,7 @@ start_link(CouchConn) ->
   }} |
   ignore |
   {error, Reason :: term()}).
-init([PGConn]) ->
+init([]) ->
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 0,
   MaxSecondsBetweenRestarts = 1,
@@ -69,7 +69,7 @@ init([PGConn]) ->
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {stream_pgsql_fsm, {stream_pgsql_fsm, start_link, [PGConn]},
+  AChild = {stream_pgsql_fsm, {stream_pgsql_fsm, start_link, []},
     Restart, Shutdown, Type, [stream_pgsql_fsm]},
 
   {ok, {SupFlags, [AChild]}}.

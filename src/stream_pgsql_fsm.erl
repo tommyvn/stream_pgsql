@@ -12,7 +12,7 @@
 -behaviour(gen_fsm).
 
 %% API
--export([start_link/2]).
+-export([start_link/1]).
 
 %% gen_fsm callbacks
 -export([init/1,
@@ -43,8 +43,19 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(PGConn :: term(), Name :: term()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link(PGConn, Name) ->
+-spec(start_link(Name :: term()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
+start_link(Name) ->
+  %% This needs to use poolboy
+  {PGHost, PGUser, PGPassword, PGOptions} = case os:getenv("DATABASE_URL") of
+                                              false ->
+                                                {"localhost", "ttytube", "ttytube", [{database, "ttytube"}]};
+                                              DatabaseUrl ->
+                                                {uri,<<"postgres">>, UserPassword, Host, Port, DBName, _, _, _} = uri:from_string(DatabaseUrl),
+                                                [User, Password] = string:tokens(binary_to_list(UserPassword), ":"),
+%%       io:format("connecting to ~p on port ~p with username ~p and password ~p~n", [Host, Port, User, Password]),
+                                                {binary_to_list(Host), User, Password, [{port, Port}, {database, tl(binary_to_list(DBName))}, {ssl, true}]}
+                                            end,
+  {ok, PGConn} = pgsql:connect(PGHost, PGUser, PGPassword, PGOptions),
   gen_fsm:start_link(?MODULE, [PGConn, Name], []).
 
 %%%===================================================================
@@ -137,12 +148,13 @@ writing(_, _From, State) ->
 
 reading(close, _From, State) ->
   {stop, normal, ok, State};
+
 reading({read, Number}, _From, #state{read_buffer = ReadBuffer} = State) when size(ReadBuffer) >= Number ->
   {reply, {ok, ReadBuffer}, reading, State#state{read_buffer = <<>>}};
 
 reading({read, _Number} = Cmd, From, #state{pgconn = PGConn, name = Name, reading_chunk = PreviousChunk, follow = Follow, read_buffer = ReadBuffer} = State) ->
   case pgsql:equery(PGConn, "select chunk, data from stream_pgsql_data where id = $1 and chunk > $2 order by chunk limit 1", [Name, PreviousChunk]) of
-    {ok, _, [{CurrentChunk, Data}]} ->
+    {ok, _, [{CurrentChunk, Data}]} when is_binary(Data)->
       reading(Cmd, From, State#state{reading_chunk = CurrentChunk, read_buffer = <<ReadBuffer/binary, Data/binary>>});
     {ok, _, []} ->
       case size(ReadBuffer) > 0 of
@@ -151,7 +163,7 @@ reading({read, _Number} = Cmd, From, #state{pgconn = PGConn, name = Name, readin
         false ->
           case Follow of
             true ->
-              {reply, {ok, <<>>}, reading, State#state{read_buffer = <<>>}};
+              {reply, {ok, <<>>}, reading, State};
             false ->
               {reply, eof, reading, State}
           end
@@ -264,7 +276,8 @@ handle_info({'DOWN', _Ref, process, _Pid, _NormalOrNoproc}, reading, #state{name
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: normal | shutdown | {shutdown, term()}
 | term(), StateName :: atom(), StateData :: term()) -> term()).
-terminate(_Reason, _StateName, _State) ->
+terminate(_Reason, _StateName, #state{pgconn = PGConn} = _State) ->
+  pgsql:close(PGConn),
   ok.
 
 %%--------------------------------------------------------------------
