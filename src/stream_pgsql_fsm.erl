@@ -150,7 +150,8 @@ reading(close, _From, State) ->
   {stop, normal, ok, State};
 
 reading({read, Number}, _From, #state{read_buffer = ReadBuffer} = State) when size(ReadBuffer) >= Number ->
-  {reply, {ok, ReadBuffer}, reading, State#state{read_buffer = <<>>}};
+  <<Data:Number/binary, RemainingBuffer/binary>> = ReadBuffer,
+  {reply, {ok, Data}, reading, State#state{read_buffer = RemainingBuffer}};
 
 reading({read, _Number} = Cmd, From, #state{pgconn = PGConn, name = Name, reading_chunk = PreviousChunk, follow = Follow, read_buffer = ReadBuffer} = State) ->
   case pgsql:equery(PGConn, "select chunk, data from stream_pgsql_data where id = $1 and chunk > $2 order by chunk limit 1", [Name, PreviousChunk]) of

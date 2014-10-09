@@ -32,7 +32,8 @@ run_all_test_() ->
           write_read_write_some_more_read_(),
           write_multiple_read_to_eof_read_close_read_(),
           write_and_read_back_file_(),
-          write_and_multiple_reads_()
+          write_and_multiple_reads_(),
+          read_by_chunk_size_()
 %%           somehow_test_pid_dies_on_linked_pid_exit(),
 %%           somehow_test_the_chunk_size_is_honered()
         ]
@@ -395,3 +396,35 @@ read(IODeviceR, Acc) ->
     Error ->
       Error
   end.
+
+read_by_chunk_size_() ->
+  {setup,
+   fun() ->
+     Name = ?TEST_FILE,
+     ?IOModule:delete(Name),
+     {ok, IODeviceW} = ?IOModule:open(Name, [write, exclusive, binary]),
+     ?IOModule:write(
+       IODeviceW,
+       lists:foldl(
+         fun(X, Acc) ->
+           NewX = list_to_binary(X),
+           <<Acc/binary, NewX/binary>>
+         end, <<>>, [ integer_to_list(X) || Y <- lists:seq(0,90), X <- lists:seq(0,9) ])),
+     ?IOModule:close(IODeviceW),
+     {ok, IODeviceR} = ?IOModule:open(Name, [read, binary]),
+     {Name, IODeviceR}
+   end,
+   fun({Name, IODeviceR}) ->
+     ?IOModule:close(IODeviceR),
+     ?IOModule:delete(Name)
+   end,
+   fun({_Name, IODeviceR}) ->
+     R1 = ?IOModule:read(IODeviceR, 10),
+     R2 = {ok, R3} = ?IOModule:read(IODeviceR, 20),
+     [
+       ?_assertEqual({ok, <<"0123456789">>}, R1),
+       ?_assertEqual({ok, <<"01234567890123456789">>}, R2),
+       ?_assertEqual(20, size(R3))
+     ]
+   end
+  }.
