@@ -36,18 +36,7 @@ list() ->
   gen_fsm:sync_send_event(StreamPid, list).
 
 start() ->
-  start_all(stream_pgsql).
-%%   observer:start().
-
-start_all(App) ->
-  case application:start(App) of
-    {error,{not_started,DepApp}} ->
-      io:format("starting ~p~n", [DepApp]),
-      start_all(DepApp),
-      start_all(App);
-    R ->
-      R
-  end.
+  application:ensure_all_started(stream_pgsql).
 
 get_mode(ModeList) ->
   get_mode(ModeList, #filedetails{}).
