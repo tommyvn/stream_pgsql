@@ -1,5 +1,5 @@
 -module(stream_pgsql).
--export([open/2, delete/1, write/2, close/1, read/2, list/0]).
+-export([open/2, delete/1, write/2, close/1, read/2, list/0, position/2]).
 -export([start/0]).
 
 
@@ -24,6 +24,9 @@ delete(Name) ->
 
 write(IODevice, Bytes) ->
   fsm_call_wrapper(IODevice, {write, Bytes}).
+
+position(IODevice, Location) ->
+  fsm_call_wrapper(IODevice, {position, Location}).
 
 read(IODevice, Number) ->
   fsm_call_wrapper(IODevice, {read, Number}).

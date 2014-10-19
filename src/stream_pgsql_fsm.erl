@@ -149,6 +149,13 @@ writing(_, _From, State) ->
 reading(close, _From, State) ->
   {stop, normal, ok, State};
 
+reading({position, {bof, Location}}, From, State) ->
+  {reply, _Answer, reading, NewState} = reading({read, Location}, From, State#state{reading_chunk = 0}),
+  {reply, {ok, Location}, reading, NewState};
+
+reading({position, Location}, _From, State) ->
+  reading({position, {bof, Location}}, _From, State);
+
 reading({read, Number}, _From, #state{read_buffer = ReadBuffer} = State) when size(ReadBuffer) >= Number ->
   <<Data:Number/binary, RemainingBuffer/binary>> = ReadBuffer,
   {reply, {ok, Data}, reading, State#state{read_buffer = RemainingBuffer}};
