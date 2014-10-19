@@ -23,25 +23,13 @@ delete(Name) ->
   gen_fsm:sync_send_event(StreamPid, delete).
 
 write(IODevice, Bytes) ->
-  try gen_fsm:sync_send_event(IODevice, {write, Bytes}) of
-    R -> R
-  catch
-    exit:{noproc,_} -> {error, terminated}
-  end.
+  fsm_call_wrapper(IODevice, {write, Bytes}).
 
 read(IODevice, Number) ->
-  try gen_fsm:sync_send_event(IODevice, {read, Number}) of
-    R -> R
-  catch
-    exit:{noproc,_} -> {error, terminated}
-  end.
+  fsm_call_wrapper(IODevice, {read, Number}).
 
 close(IODevice) ->
-  try gen_fsm:sync_send_event(IODevice, close) of
-    R -> R
-  catch
-    exit:{noproc,_} -> {error, terminated}
-  end.
+  fsm_call_wrapper(IODevice, close).
 
 list() ->
   {ok, StreamPid} = stream_pgsql_sup:start_child(nil),
@@ -84,3 +72,10 @@ get_mode([binary | Rest], #filedetails{binary = nil} = FileDetails) ->
 
 get_mode(_, _FileDetails) ->
   {error, badarg}.
+
+fsm_call_wrapper(IODevice, Cmd) ->
+  try gen_fsm:sync_send_event(IODevice, Cmd) of
+    R -> R
+  catch
+    exit:{noproc,_} -> {error, terminated}
+  end.
